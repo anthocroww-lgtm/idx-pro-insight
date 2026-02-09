@@ -1,0 +1,8 @@
+# Tema gelap agar sidebar dan main konsisten (tidak putih)
+[theme]
+base = "dark"
+primaryColor = "#58a6ff"
+backgroundColor = "#0d1117"
+secondaryBackgroundColor = "#161b22"
+textColor = "#e6edf3"
+font = "sans serif"

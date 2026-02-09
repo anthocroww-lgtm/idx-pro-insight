@@ -1,0 +1,16 @@
+# Jangan commit credential
+.streamlit/secrets.toml
+
+# Python
+__pycache__/
+*.py[cod]
+venv/
+.venv/
+env/
+*.egg-info/
+.pytest_cache/
+
+# IDE
+.idea/
+.vscode/
+*.swp
