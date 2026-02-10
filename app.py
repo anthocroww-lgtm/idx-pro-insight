@@ -160,6 +160,18 @@ user = get_current_user()
 logged_in = user is not None
 
 # --- Sidebar ---
+def get_invite_code():
+    """Ambil kode undangan dari st.secrets (opsional)."""
+    try:
+        if hasattr(st.secrets, "app") and st.secrets.app:
+            sec = st.secrets.app
+            return sec.get("invite_code") if isinstance(sec, dict) else getattr(sec, "invite_code", None)
+        if hasattr(st.secrets, "INVITE_CODE"):
+            return st.secrets.INVITE_CODE
+    except Exception:
+        return None
+
+
 with st.sidebar:
     st.markdown("### IDX-Pro Insight")
     st.caption("Terminal · Analisis Saham IDX")
@@ -170,10 +182,10 @@ with st.sidebar:
         st.caption(user.get("email", ""))
     else:
         st.caption("Akses fitur Pro & Portofolio Cloud")
-        auth_tab = st.radio("Pilih", ["Masuk", "Daftar"], key="auth_tab", label_visibility="collapsed", horizontal=True)
+        auth_tab = st.radio("Pilih", ["Masuk", "Daftar (kode undangan)"], key="auth_tab", label_visibility="collapsed", horizontal=True)
         st.markdown("")  # jarak
-        if auth_tab == "Masuk":
-            # Pre-isi dari yang diingat agar tidak perlu mengetik lagi
+        if auth_tab.startswith("Masuk"):
+            # Form login (seperti biasa)
             if st.session_state.remembered_email and "login_email" not in st.session_state:
                 st.session_state.login_email = st.session_state.remembered_email
             if st.session_state.remembered_password and "login_pass" not in st.session_state:
@@ -205,18 +217,28 @@ with st.sidebar:
                     else:
                         st.error(msg)
         else:
+            # Form daftar dengan kode undangan
+            st.markdown("_Pendaftaran hanya untuk yang memiliki kode undangan dari admin._")
             name_reg = st.text_input("Nama lengkap", key="reg_name", placeholder="Nama Anda", label_visibility="visible")
             email_reg = st.text_input("Email", key="reg_email", placeholder="nama@email.com", label_visibility="visible")
             pass_reg = st.text_input("Kata sandi", type="password", key="reg_pass", placeholder="Min. 6 karakter", label_visibility="visible")
+            invite_input = st.text_input("Kode undangan", type="password", key="reg_invite", placeholder="Kode dari admin", label_visibility="visible")
             if st.button("Daftar", type="primary", use_container_width=True):
                 err = []
                 if not (email_reg or "").strip():
                     err.append("Email harus diisi.")
                 if not (pass_reg or "").strip():
                     err.append("Kata sandi harus diisi.")
+                if not (invite_input or "").strip():
+                    err.append("Kode undangan harus diisi.")
+                expected_code = (get_invite_code() or "").strip()
+                if expected_code and invite_input.strip() != expected_code:
+                    err.append("Kode undangan salah.")
+                if not expected_code:
+                    err.append("Kode undangan belum dikonfigurasi. Hubungi admin.")
                 if err:
                     st.error(" ".join(err))
-                elif email_reg and pass_reg:
+                elif email_reg and pass_reg and expected_code and invite_input.strip() == expected_code:
                     ok, msg, u = register(email_reg.strip(), pass_reg, name_reg.strip())
                     if ok and u:
                         set_user(u)
