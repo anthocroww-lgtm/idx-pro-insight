@@ -39,6 +39,8 @@ def login(email: str, password: str):
                 "uid": data.get("localId"),
                 "email": data.get("email"),
                 "display_name": data.get("displayName") or email.split("@")[0],
+                "id_token": data.get("idToken"),
+                "expires_in": data.get("expiresIn"),  # detik
             }
         err = data.get("error", {}).get("message", r.text)
         return False, f"Login gagal: {err}", None
@@ -69,6 +71,8 @@ def register(email: str, password: str, display_name: str = ""):
                 "uid": data.get("localId"),
                 "email": data.get("email"),
                 "display_name": display_name or email.split("@")[0],
+                "id_token": data.get("idToken"),
+                "expires_in": data.get("expiresIn"),
             }
         err = data.get("error", {}).get("message", r.text)
         return False, f"Registrasi gagal: {err}", None

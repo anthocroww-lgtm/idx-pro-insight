@@ -51,6 +51,30 @@ def get_firestore_client():
         return None
 
 
+def verify_firebase_id_token(id_token: str):
+    """
+    Verifikasi Firebase ID token (dari login). Return dict {uid, email, display_name} atau None.
+    Tidak mengubah data; hanya untuk restore session setelah refresh.
+    """
+    if not id_token or not isinstance(id_token, str) or not id_token.strip():
+        return None
+    try:
+        import firebase_admin
+        from firebase_admin import auth
+        if not firebase_admin._apps:
+            get_firestore_client()
+        if not firebase_admin._apps:
+            return None
+        decoded = auth.verify_id_token(id_token.strip())
+        return {
+            "uid": decoded.get("uid"),
+            "email": decoded.get("email"),
+            "display_name": decoded.get("name") or (decoded.get("email") or "").split("@")[0],
+        }
+    except Exception:
+        return None
+
+
 def save_to_firestore(user_id: str, collection: str, data: dict, doc_id: str = None):
     """
     Simpan data ke sub-collection user di Firestore.

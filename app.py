@@ -10,7 +10,7 @@ import numpy as np
 from datetime import datetime
 
 from auth_manager import init_session, login, register, logout, get_current_user, set_user
-from firebase_config import save_to_firestore, get_from_firestore
+from firebase_config import save_to_firestore, get_from_firestore, verify_firebase_id_token
 from analysis_engine import ensure_jk, run_full_analysis, get_history, get_macro_symbol
 from data_engine import get_stock_data, get_benchmark, get_stock_and_benchmark
 from quant_engine import compute_atr, safe_entry_calculator, compute_mansfield_rs, compute_seasonality
@@ -148,6 +148,15 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
+# --- Cookie manager (untuk tetap login setelah refresh) ---
+_cookies = None
+try:
+    _cookie_pwd = (st.secrets.get("app") or {}).get("cookie_password") or "idx_pro_insight_cookie_key"
+    from streamlit_cookies_manager import EncryptedCookieManager
+    _cookies = EncryptedCookieManager(prefix="idxpro/", password=_cookie_pwd)
+except Exception:
+    pass
+
 # --- Inisialisasi session ---
 init_session()
 if "remembered_email" not in st.session_state:
@@ -156,6 +165,28 @@ if "remembered_password" not in st.session_state:
     st.session_state.remembered_password = ""
 if "ticker_input" not in st.session_state:
     st.session_state.ticker_input = "BBCA"
+
+# Restore login dari cookie (setelah refresh) — tidak mengubah data, hanya session
+if _cookies is not None:
+    if not _cookies.ready():
+        st.rerun()
+    elif not st.session_state.logged_in:
+        _token = None
+        try:
+            _token = _cookies["idx_token"]
+        except (KeyError, TypeError, Exception):
+            pass
+        if _token:
+            _decoded = verify_firebase_id_token(_token)
+            if _decoded and _decoded.get("uid"):
+                set_user(_decoded)
+            else:
+                try:
+                    del _cookies["idx_token"]
+                    _cookies.save()
+                except Exception:
+                    pass
+
 user = get_current_user()
 logged_in = user is not None
 
@@ -212,6 +243,12 @@ with st.sidebar:
                             st.session_state.remembered_email = ""
                             st.session_state.remembered_password = ""
                         set_user(u)
+                        if _cookies is not None and u.get("id_token"):
+                            try:
+                                _cookies["idx_token"] = u["id_token"]
+                                _cookies.save()
+                            except Exception:
+                                pass
                         st.success(msg)
                         st.rerun()
                     else:
@@ -242,6 +279,12 @@ with st.sidebar:
                     ok, msg, u = register(email_reg.strip(), pass_reg, name_reg.strip())
                     if ok and u:
                         set_user(u)
+                        if _cookies is not None and u.get("id_token"):
+                            try:
+                                _cookies["idx_token"] = u["id_token"]
+                                _cookies.save()
+                            except Exception:
+                                pass
                         st.success(msg)
                         st.rerun()
                     else:
@@ -256,8 +299,17 @@ with st.sidebar:
         ["Peluang Hari Ini", "Analisis Mendalam", "Tanya Gemini", "Portofolio Saya", "Logout"] if logged_in
         else ["Peluang Hari Ini", "Market Overview", "Tanya Gemini"]
     )
-    default_idx = 1 if (st.session_state.get("force_menu") and "Analisis Mendalam" in menu_options) else 0
-    menu = st.radio("Menu", menu_options, index=min(default_idx, len(menu_options) - 1), label_visibility="collapsed")
+    # Tetap di halaman yang sama setelah refresh: baca menu dari URL
+    _qmenu = st.query_params.get("menu")
+    if _qmenu in menu_options:
+        default_idx = menu_options.index(_qmenu)
+    elif st.session_state.get("force_menu") and "Analisis Mendalam" in menu_options:
+        default_idx = menu_options.index("Analisis Mendalam") if "Analisis Mendalam" in menu_options else 0
+    else:
+        default_idx = 0
+    menu = st.radio("Menu", menu_options, index=min(default_idx, len(menu_options) - 1), key="menu_radio", label_visibility="collapsed")
+    if st.query_params.get("menu") != menu:
+        st.query_params["menu"] = menu
     if st.session_state.get("force_menu"):
         del st.session_state["force_menu"]
     if st.session_state.get("analysis_ticker"):
@@ -265,6 +317,12 @@ with st.sidebar:
 
     if menu == "Logout":
         logout()
+        if _cookies is not None:
+            try:
+                del _cookies["idx_token"]
+                _cookies.save()
+            except Exception:
+                pass
         st.rerun()
 
     st.divider()
@@ -356,7 +414,9 @@ if menu == "Peluang Hari Ini":
             fig_c.update_layout(
                 template="plotly_dark",
                 height=400,
-                xaxis_rangeslider_visible=False,
+                # Aktifkan pan & zoom nyaman (bisa geser kiri/kanan setelah zoom)
+                dragmode="pan",
+                xaxis_rangeslider_visible=True,
                 paper_bgcolor="rgba(0,0,0,0)",
                 plot_bgcolor="rgba(22,27,34,0.4)",
                 xaxis=dict(
@@ -612,7 +672,14 @@ elif menu == "Analisis Mendalam" or menu == "Market Overview":
             fig.add_trace(go.Scatter(x=df.index, y=df["MA50"], name="MA50", line=dict(color="#a371f7", width=1.5)))
         if "MA200" in df.columns:
             fig.add_trace(go.Scatter(x=df.index, y=df["MA200"], name="MA200", line=dict(color="#39c5cf", width=1.5)))
-        fig.update_layout(**_chart_layout, height=420, yaxis_title="Harga (Rp)")
+        # Aktifkan pan & zoom horizontal yang nyaman dengan range slider
+        fig.update_layout(
+            **_chart_layout,
+            height=420,
+            yaxis_title="Harga (Rp)",
+            dragmode="pan",
+            xaxis=dict(rangeslider=dict(visible=True))
+        )
         st.plotly_chart(fig, use_container_width=True)
 
         if "RSI" in df.columns:
@@ -620,7 +687,13 @@ elif menu == "Analisis Mendalam" or menu == "Market Overview":
             fig_rsi.add_trace(go.Scatter(x=df.index, y=df["RSI"], name="RSI(14)", line=dict(color="#a371f7", width=2)))
             fig_rsi.add_hline(y=70, line_dash="dash", line_color="rgba(248,81,73,0.6)", annotation_text="Overbought")
             fig_rsi.add_hline(y=30, line_dash="dash", line_color="rgba(63,185,80,0.6)", annotation_text="Oversold")
-            fig_rsi.update_layout(**_chart_layout, height=200, yaxis_range=[0, 100], yaxis_title="RSI")
+            fig_rsi.update_layout(
+                **_chart_layout,
+                height=200,
+                yaxis_range=[0, 100],
+                yaxis_title="RSI",
+                dragmode="pan",
+            )
             st.plotly_chart(fig_rsi, use_container_width=True)
 
         # Mansfield Relative Strength vs IHSG (momentum komparatif)
@@ -637,7 +710,12 @@ elif menu == "Analisis Mendalam" or menu == "Market Overview":
                 line=dict(color="#58a6ff"), fillcolor="rgba(63,185,80,0.3)" if last_rs >= 0 else "rgba(248,81,73,0.3)"
             ))
             fig_mr.add_hline(y=0, line_dash="dash", line_color="rgba(139,148,158,0.6)")
-            fig_mr.update_layout(**_chart_layout, height=220, yaxis_title="Mansfield RS")
+            fig_mr.update_layout(
+                **_chart_layout,
+                height=220,
+                yaxis_title="Mansfield RS",
+                dragmode="pan",
+            )
             st.plotly_chart(fig_mr, use_container_width=True)
 
         if key_levels:
@@ -658,7 +736,12 @@ elif menu == "Analisis Mendalam" or menu == "Market Overview":
             st.caption("Konfirmasi volume: OBV naik = volume mengikuti kenaikan harga.")
             fig_obv = go.Figure()
             fig_obv.add_trace(go.Scatter(x=obv.index, y=obv.values, name="OBV", line=dict(color="#39c5cf", width=2)))
-            fig_obv.update_layout(**_chart_layout, height=220, yaxis_title="OBV")
+            fig_obv.update_layout(
+                **_chart_layout,
+                height=220,
+                yaxis_title="OBV",
+                dragmode="pan",
+            )
             st.plotly_chart(fig_obv, use_container_width=True)
 
         sr = support_resistance
