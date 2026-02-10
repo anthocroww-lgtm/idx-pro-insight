@@ -167,25 +167,23 @@ if "ticker_input" not in st.session_state:
     st.session_state.ticker_input = "BBCA"
 
 # Restore login dari cookie (setelah refresh) — tidak mengubah data, hanya session
-if _cookies is not None:
-    if not _cookies.ready():
-        st.rerun()
-    elif not st.session_state.logged_in:
-        _token = None
-        try:
-            _token = _cookies["idx_token"]
-        except (KeyError, TypeError, Exception):
-            pass
-        if _token:
-            _decoded = verify_firebase_id_token(_token)
-            if _decoded and _decoded.get("uid"):
-                set_user(_decoded)
-            else:
-                try:
-                    del _cookies["idx_token"]
-                    _cookies.save()
-                except Exception:
-                    pass
+# Jangan st.rerun() saat cookie belum ready agar halaman tetap bisa tampil (hindari loading tak selesai)
+if _cookies is not None and _cookies.ready() and not st.session_state.logged_in:
+    _token = None
+    try:
+        _token = _cookies["idx_token"]
+    except (KeyError, TypeError, Exception):
+        pass
+    if _token:
+        _decoded = verify_firebase_id_token(_token)
+        if _decoded and _decoded.get("uid"):
+            set_user(_decoded)
+        else:
+            try:
+                del _cookies["idx_token"]
+                _cookies.save()
+            except Exception:
+                pass
 
 user = get_current_user()
 logged_in = user is not None
