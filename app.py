@@ -491,13 +491,17 @@ elif menu == "Analisis Mendalam" or menu == "Market Overview":
     data_as_of = result.get("data_as_of")
     trading_days_count = result.get("trading_days_count", 0)
 
-    # Layout 4 tab: Dashboard Utama | Manajemen Risiko | Analisis Musiman | Sentimen Berita
-    tab_dash, tab_risk, tab_season, tab_sent = st.tabs([
-        "Dashboard Utama",
-        "Manajemen Risiko (ATR)",
-        "Analisis Musiman",
-        "Sentimen Berita",
-    ])
+    # Pilih bagian (radio agar tetap di tab yang sama saat input berubah; st.tabs tidak simpan state saat rerun)
+    _tab_names = ["Dashboard Utama", "Manajemen Risiko (ATR)", "Analisis Musiman", "Sentimen Berita"]
+    if "analisis_sub_tab" not in st.session_state:
+        st.session_state.analisis_sub_tab = _tab_names[0]
+    sub_tab = st.radio(
+        "Bagian",
+        _tab_names,
+        key="analisis_sub_tab",
+        horizontal=True,
+        label_visibility="collapsed",
+    )
 
     _chart_layout = dict(
         template="plotly_dark",
@@ -511,7 +515,7 @@ elif menu == "Analisis Mendalam" or menu == "Market Overview":
     )
 
     # ========== TAB 1: Dashboard Utama — Cockpit Trader + Analisis ==========
-    with tab_dash:
+    if sub_tab == "Dashboard Utama":
         # --- Cockpit Trader: Market Context & Psychology ---
         st.subheader("Cockpit Trader · Market Context & Psychology")
         mood = _cached_market_mood()
@@ -859,7 +863,7 @@ elif menu == "Analisis Mendalam" or menu == "Market Overview":
                     st.error(msg)
 
     # ========== TAB 2: Manajemen Risiko (ATR & Safe Entry Calculator) ==========
-    with tab_risk:
+    elif sub_tab == "Manajemen Risiko (ATR)":
         st.subheader("Safe Entry Calculator · Manajemen Risiko Berbasis ATR")
         st.caption("Position sizing berdasarkan volatilitas (ATR 14). Stop Loss = ATR × multiplier (skenario Long).")
         modal_rp = st.number_input("Modal Trading (Rp)", min_value=1_000_000, value=100_000_000, step=10_000_000, key="modal_rp")
@@ -886,7 +890,7 @@ elif menu == "Analisis Mendalam" or menu == "Market Overview":
         st.info("ATR 14 mengukur volatilitas harian. Posisi maksimal dihitung agar kerugian per trade tidak melebihi risiko yang Anda pilih.")
 
     # ========== TAB 3: Analisis Musiman (Seasonality Matrix) ==========
-    with tab_season:
+    elif sub_tab == "Analisis Musiman":
         st.subheader("Probabilitas Musiman · Rata-rata Return & Win Rate per Bulan")
         st.caption("Data historis minimal 10 tahun. Pola Window Dressing / January Effect.")
         df_10y = get_stock_data(ticker, "10y")
@@ -929,7 +933,7 @@ elif menu == "Analisis Mendalam" or menu == "Market Overview":
                 st.caption("Win rate (% bulan positif): " + ", ".join([f"{month_names[i-1]} {wr.get(i, 0):.0f}%" for i in range(1, 13) if i in wr.index]))
 
     # ========== TAB 4: Sentimen Berita (Leksikon Indonesia) ==========
-    with tab_sent:
+    elif sub_tab == "Sentimen Berita":
         st.subheader("Analisis Sentimen Berita · Leksikon Pasar Modal Indonesia")
         st.caption("Tempel judul/teks berita terkini tentang saham. Skor dari kata kunci positif vs negatif.")
         news_text = st.text_area("Teks berita (copy-paste judul atau isi)", height=120, placeholder="Contoh: Emiten catat laba naik 20%, dividen melonjak...")
