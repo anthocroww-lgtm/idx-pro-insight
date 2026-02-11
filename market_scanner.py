@@ -46,7 +46,7 @@ def _jk_list(symbols: list) -> list:
     return [_ensure_jk(s) for s in symbols]
 
 
-@st.cache_data(ttl=3600)
+@st.cache_data(ttl=600)
 def fetch_market_data():
     """
     Bulk download data 6 bulan untuk semua ticker prioritas.
@@ -334,18 +334,21 @@ def get_ihsg_today():
         return None, None, None
 
 
-def get_intraday_15m(ticker: str):
+@st.cache_data(ttl=300)
+def get_intraday_15m(ticker: str, interval: str = "15m"):
     """
-    Data intraday 15 menit untuk candlestick. WIB.
-    Jika pasar tutup: pakai data akhir sebelum pasar tutup (sesi terakhir tersedia).
+    Data intraday untuk candlestick. WIB. Cache 5 menit (sinkron dengan data saham).
+    interval: "5m" (lebih granular) atau "15m". Jika pasar tutup: pakai data akhir sebelum tutup.
     Return (DataFrame, last_timestamp) agar UI bisa tampilkan "Data terakhir: ...".
     """
+    if interval not in ("5m", "15m"):
+        interval = "15m"
     try:
         t = _ensure_jk(ticker) if not ticker.endswith(".JK") else ticker
         obj = yf.Ticker(t)
-        df = obj.history(period="5d", interval="15m", auto_adjust=True)
+        df = obj.history(period="5d", interval=interval, auto_adjust=True)
         if df is None or df.empty:
-            df = obj.history(period="1mo", interval="15m", auto_adjust=True)
+            df = obj.history(period="1mo", interval=interval, auto_adjust=True)
         if df is None or df.empty:
             return None, None
         try:

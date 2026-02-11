@@ -15,6 +15,7 @@ import androidx.activity.OnBackPressedDispatcher
 
 /**
  * WebView wrapper untuk aplikasi Streamlit (IDX-Pro Insight).
+ * Versi web direferensi: 1.3.0 (sinkron dengan deploy terbaru).
  * - Back: OnBackPressedDispatcher (tanpa deprecation).
  * - Progress bar saat loading.
  * - Cookie & WebViewClient diperbaiki untuk redirect/HTTPS.
@@ -78,7 +79,7 @@ class MainActivity : ComponentActivity() {
             }
         })
 
-        // GANTI dengan URL Streamlit Anda
+        // GANTI dengan URL Streamlit Anda (setelah deploy web terbaru, Android tampil sama)
         val appUrl = "https://idx-pro-insight-22.streamlit.app"
 
         // Restore state agar setelah refresh/rotate app tetap login (cookie & halaman tidak hilang)

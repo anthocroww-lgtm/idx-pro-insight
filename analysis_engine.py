@@ -361,38 +361,53 @@ def get_support_resistance(df: pd.DataFrame, lookback: int = 20) -> dict:
     return {"support": sorted(set(sup)), "resistance": sorted(set(res), reverse=True)}
 
 
-# --- RINGKASAN TELAAH (narasi singkat) ---
+# --- RINGKASAN TELAAH (narasi terstruktur, jelas dan rinci) ---
 def get_insight_summary(technical: dict, bandar: dict, fundamental: dict, plan: dict, key_levels: dict) -> str:
     """
-    Gabungkan sinyal teknikal, bandar, fundamental jadi 1–2 kalimat ringkasan.
-    Membantu user menelaah saham secara mendalam dengan cepat.
+    Gabungkan sinyal teknikal, bandar, fundamental jadi ringkasan terstruktur (poin per poin).
+    Membantu user menelaah saham secara mendalam dengan cepat dan jelas.
     """
-    parts = []
-    if technical.get("trend"):
-        parts.append(technical["trend"].split("(")[0].strip())
+    lines = []
+    # Tren
+    if technical.get("trend") and str(technical["trend"]).strip() != "-":
+        lines.append(f"• **Tren:** {technical['trend'].strip()}")
+    # RSI
     if technical.get("last_rsi") is not None:
         r = technical["last_rsi"]
         if r < 30:
-            parts.append("RSI oversold, potensi rebound.")
+            lines.append(f"• **RSI ({r:.0f}):** Zona oversold — potensi rebound; pantau konfirmasi reversal.")
         elif r > 70:
-            parts.append("RSI overbought, hati-hati profit taking.")
-    if bandar.get("signal") and "Akumulasi" in str(bandar["signal"]):
-        parts.append("Volume mengindikasikan akumulasi.")
-    elif bandar.get("signal") and "Distribusi" in str(bandar["signal"]):
-        parts.append("Volume mengindikasikan distribusi.")
+            lines.append(f"• **RSI ({r:.0f}):** Zona overbought — hati-hati profit taking; hindari entry agresif.")
+        else:
+            lines.append(f"• **RSI ({r:.0f}):** Netral — momentum belum ekstrem.")
+    # Volume / Bandar
+    if bandar.get("signal") and str(bandar["signal"]).strip() != "-":
+        if "Akumulasi" in str(bandar["signal"]):
+            lines.append("• **Volume:** Mengindikasikan akumulasi — harga naik didukung volume tinggi (buying pressure).")
+        elif "Distribusi" in str(bandar["signal"]):
+            lines.append("• **Volume:** Mengindikasikan distribusi — waspada selling pressure di volume tinggi.")
+        else:
+            lines.append(f"• **Volume:** {bandar['signal']} — {bandar.get('description', '')[:80]}")
+    # Fundamental
     if fundamental.get("labels"):
         for lbl in fundamental["labels"]:
             if "Hidden Gem" in lbl:
-                parts.append("Valuasi menarik (Hidden Gem).")
+                lines.append("• **Valuasi:** Attractive (Hidden Gem) — PER rendah dengan ROE solid; cocok screening jangka panjang.")
             elif "High Debt" in lbl:
-                parts.append("Perhatikan utang tinggi.")
+                lines.append("• **Risiko:** Perhatikan utang tinggi (DER); pastikan arus kas dan kemampuan bayar.")
+    # Posisi vs 52w
     if key_levels.get("pct_from_52w_high") is not None:
         d = key_levels["pct_from_52w_high"]
         if -15 <= d <= -5:
-            parts.append("Saham dalam zona koreksi wajar dari ATH 52w.")
-    if not parts:
-        return "Gunakan indikator di atas untuk keputusan."
-    return " ".join(parts[:4])
+            lines.append(f"• **Posisi 52w:** Dalam zona koreksi wajar ({d:.0f}% dari high 52 minggu) — area akumulasi potensial.")
+        elif d is not None and d > -3:
+            lines.append(f"• **Posisi 52w:** Dekat high 52 minggu ({d:.0f}%) — risk/reward entry kurang menguntungkan.")
+    # Bollinger
+    if technical.get("squeeze"):
+        lines.append("• **Bollinger:** Squeeze terdeteksi (pita menyempit) — potensi breakout; tunggu konfirmasi arah.")
+    if not lines:
+        return "Gunakan indikator di atas (tren, RSI, volume, support/resistance) untuk menyusun kesimpulan secara mandiri."
+    return "\n\n".join(lines)
 
 
 # --- KESIMPULAN & REKOMENDASI (saran beli/tidak + range harga) ---
@@ -444,19 +459,32 @@ def get_recommendation(
     # --- Cek kondisi "tidak disarankan" / harga terlalu tinggi ---
     if rsi is not None and rsi > 70:
         out["avoid_reason"] = f"RSI overbought ({rsi:.0f}). Harga rawan koreksi."
-        out["summary"] = f"Tidak disarankan beli di harga saat ini (Rp {close:,.0f}). Tunggu koreksi ke area Rp {buy_low:,.0f} – Rp {buy_high:,.0f}."
+        out["summary"] = (
+            f"**Tidak disarankan beli di harga saat ini (Rp {close:,.0f}).** "
+            f"RSI di zona overbought meningkatkan risiko koreksi jangka pendek. "
+            f"**Tindakan:** Tunggu koreksi ke area support Rp {buy_low:,.0f} – Rp {buy_high:,.0f} sebelum pertimbangkan entry. "
+            f"Target resistance: Rp {target_low:,.0f} – Rp {target_high:,.0f}. Selalu gunakan stop loss."
+        )
         out["buy_range_low"], out["buy_range_high"] = buy_low, buy_high
         out["target_low"], out["target_high"] = target_low, target_high
         return out
     if close >= resistance * 0.98:
         out["avoid_reason"] = "Harga mendekati resistance. Risk/reward tidak menguntungkan."
-        out["summary"] = f"Tunggu koreksi ke zona beli Rp {buy_low:,.0f} – Rp {buy_high:,.0f}. Target area: Rp {target_low:,.0f} – Rp {target_high:,.0f}."
+        out["summary"] = (
+            f"**Saat ini tidak menguntungkan untuk entry** — harga sudah mendekati resistance. "
+            f"**Tindakan:** Tunggu koreksi ke zona beli Rp {buy_low:,.0f} – Rp {buy_high:,.0f} agar risk/reward lebih baik. "
+            f"Target area: Rp {target_low:,.0f} – Rp {target_high:,.0f}. Pastikan stop loss di bawah support."
+        )
         out["buy_range_low"], out["buy_range_high"] = buy_low, buy_high
         out["target_low"], out["target_high"] = target_low, target_high
         return out
     if per is not None and per > 25 and pct_from_52w_high is not None and pct_from_52w_high > -5:
         out["avoid_reason"] = f"Valuasi tinggi (PER {per:.0f}) dan harga dekat 52w high."
-        out["summary"] = f"Lebih aman tunggu koreksi ke Rp {buy_low:,.0f} – Rp {buy_high:,.0f} untuk entry jangka panjang."
+        out["summary"] = (
+            f"**Lebih aman tunggu koreksi** — valuasi tinggi (PER {per:.0f}) dan harga masih dekat 52w high. "
+            f"**Tindakan:** Pertimbangkan entry jangka panjang hanya di area Rp {buy_low:,.0f} – Rp {buy_high:,.0f} setelah koreksi. "
+            f"Target jangka panjang: Rp {target_low:,.0f} – Rp {target_high:,.0f}. Diversifikasi dan batasi porsi per saham."
+        )
         out["buy_range_low"], out["buy_range_high"] = buy_low, buy_high
         out["target_low"], out["target_high"] = target_low, target_high
         return out
@@ -468,7 +496,11 @@ def get_recommendation(
         out["style_label"] = "Cocok untuk Day Trading (scalping)"
         out["buy_range_low"], out["buy_range_high"] = buy_low, buy_high
         out["target_low"], out["target_high"] = target_low, target_high
-        out["summary"] = f"Volume mendukung. Area beli: Rp {buy_low:,.0f} – Rp {buy_high:,.0f}. Target: Rp {target_low:,.0f} – Rp {target_high:,.0f}. Gunakan stop loss ketat."
+        out["summary"] = (
+            f"**Sinyal:** Volume di atas rata-rata dan harga di sekitar support — kondisi mendukung skenario day trade. "
+            f"**Area beli:** Rp {buy_low:,.0f} – Rp {buy_high:,.0f}. **Target:** Rp {target_low:,.0f} – Rp {target_high:,.0f}. "
+            f"**Catatan:** Gunakan stop loss ketat dan kelola posisi; day trade berisiko tinggi."
+        )
         return out
 
     # --- Cocok Swing: uptrend, RSI netral, harga di atas MA20 ---
@@ -478,7 +510,11 @@ def get_recommendation(
         out["buy_range_low"] = round(support, 0)
         out["buy_range_high"] = round(ma20 * 1.02, 0) if ma20 else buy_high
         out["target_low"], out["target_high"] = target_low, target_high
-        out["summary"] = f"Uptrend jangka pendek. Area beli: Rp {out['buy_range_low']:,.0f} – Rp {out['buy_range_high']:,.0f}. Target: Rp {target_low:,.0f} – Rp {target_high:,.0f}."
+        out["summary"] = (
+            f"**Sinyal:** Uptrend jangka pendek — harga di atas MA20 dan RSI netral. "
+            f"**Area beli:** Rp {out['buy_range_low']:,.0f} – Rp {out['buy_range_high']:,.0f}. **Target:** Rp {target_low:,.0f} – Rp {target_high:,.0f}. "
+            f"**Catatan:** Cocok hold 1–2 minggu; tetapkan target dan stop loss sebelum entry."
+        )
         return out
 
     # --- Cocok Invest jangka panjang: di atas MA200, koreksi 5–15% dari 52w high ---
@@ -489,7 +525,11 @@ def get_recommendation(
         out["buy_range_high"] = round(close * 1.02, 0)
         out["target_low"] = round(high_52 * 0.95, 0) if high_52 else target_low
         out["target_high"] = round(high_52 * 1.05, 0) if high_52 else target_high
-        out["summary"] = f"Buy on dip dari 52w high. Area akumulasi: Rp {out['buy_range_low']:,.0f} – Rp {out['buy_range_high']:,.0f}. Target jangka panjang mendekati 52w high."
+        out["summary"] = (
+            f"**Sinyal:** Buy on dip — harga di atas MA200 dan dalam koreksi wajar dari 52w high. "
+            f"**Area akumulasi:** Rp {out['buy_range_low']:,.0f} – Rp {out['buy_range_high']:,.0f}. **Target jangka panjang:** mendekati 52w high (Rp {out['target_low']:,.0f} – Rp {out['target_high']:,.0f}). "
+            f"**Catatan:** Cocok untuk horizon panjang; lakukan riset fundamental dan diversifikasi."
+        )
         return out
 
     # --- Default: saran hati-hati dengan range ---
@@ -497,7 +537,11 @@ def get_recommendation(
     out["style_label"] = "Netral – perhatikan area support sebelum beli"
     out["buy_range_low"], out["buy_range_high"] = buy_low, buy_high
     out["target_low"], out["target_high"] = target_low, target_high
-    out["summary"] = f"Disarankan entry di area Rp {buy_low:,.0f} – Rp {buy_high:,.0f}. Target: Rp {target_low:,.0f} – Rp {target_high:,.0f}. Pastikan stop loss."
+    out["summary"] = (
+        f"**Kesimpulan:** Tidak ada sinyal kuat Day/Swing/Invest; tetap bisa dipertimbangkan dengan hati-hati. "
+        f"**Area entry disarankan:** Rp {buy_low:,.0f} – Rp {buy_high:,.0f}. **Target:** Rp {target_low:,.0f} – Rp {target_high:,.0f}. "
+        f"**Catatan:** Wajib gunakan stop loss dan pastikan ukuran posisi sesuai risiko Anda."
+    )
     return out
 
 

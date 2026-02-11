@@ -1,6 +1,7 @@
 # Referensi WebView Android (IDX-Pro Insight)
 
-Salin isi file di folder ini ke project Android Studio Anda (`MyApplication`).
+Salin isi file di folder ini ke project Android Studio Anda (`MyApplication`).  
+**Versi aplikasi web yang direferensi:** 1.3.0 (grafik intraday 5m/15m, kesimpulan rinci, refresh data lebih cepat).
 
 ## 1. MainActivity.kt
 
@@ -42,3 +43,8 @@ Lihat **ICON_SETUP.md** di folder ini: cara memasang logo profesional ke project
 1. File → Sync Project with Gradle Files
 2. Build → Make Project
 3. Run ▶ ke emulator atau perangkat
+
+## Update perubahan ke web & Android
+
+- **Web:** Deploy terbaru (push ke repo Streamlit Cloud). Versi tampil di judul tab (v1.3.0) dan di sidebar.
+- **Android:** WebView memuat URL web yang sama. Setelah web di-update, buka lagi app Android atau tarik-refresh di dalam WebView — tampilan mengikuti web terbaru tanpa perlu update APK. Jika URL deploy berubah, edit `val appUrl = "..."` di `MainActivity.kt`.

@@ -20,10 +20,10 @@ def ensure_jk(ticker: str) -> str:
     return t
 
 
-@st.cache_data(ttl=3600)
+@st.cache_data(ttl=300)
 def get_stock_data(ticker: str, period: str = "1y") -> pd.DataFrame:
     """
-    Ambil data historis saham dari yfinance dengan caching (1 jam).
+    Ambil data historis saham dari yfinance dengan caching (5 menit).
     Mengembalikan DataFrame dengan kolom Open, High, Low, Close, Volume.
     Mengembalikan DataFrame kosong jika ticker tidak ditemukan atau delisting.
     """
@@ -40,7 +40,7 @@ def get_stock_data(ticker: str, period: str = "1y") -> pd.DataFrame:
         return pd.DataFrame()
 
 
-@st.cache_data(ttl=3600)
+@st.cache_data(ttl=300)
 def get_benchmark(period: str = "1y") -> pd.DataFrame:
     """
     Ambil data Indeks Harga Saham Gabungan (IHSG) sebagai benchmark wajib

@@ -2,6 +2,8 @@
 
 Aplikasi analisis saham IDX (Streamlit): Teknikal, Fundamental, Bandarmology, Korelasi Makro. Login & Portofolio Cloud via Firebase.
 
+**Versi:** 1.3.0 (lihat [DEPLOY.md](DEPLOY.md) untuk deploy ke web; Android pakai WebView ke URL yang sama).
+
 ## Setup
 
 1. **Virtual environment (opsional):**
@@ -30,6 +32,13 @@ Aplikasi analisis saham IDX (Streamlit): Teknikal, Fundamental, Bandarmology, Ko
    (Di Windows gunakan `python -m streamlit run app.py` jika perintah `streamlit` tidak dikenali.)
 
 Tanpa Firebase, aplikasi tetap jalan; hanya fitur Login dan Portofolio Cloud yang tidak aktif. Tanpa Gemini API key, menu "Tanya Gemini" akan meminta Anda menambahkan key.
+
+---
+
+## Update ke web & Android
+
+- **Web:** Setelah mengubah kode, push ke repo yang dipakai Streamlit Cloud (atau server Anda). Aplikasi web akan otomatis rebuild dan menampilkan versi terbaru (tab browser: "IDX-Pro Insight Terminal (v1.3.0)").
+- **Android Studio:** Aplikasi Android hanya menampilkan URL web di WebView. Tidak perlu update APK untuk konten baru — cukup deploy web, lalu buka kembali app Android atau refresh; yang tampil adalah versi web terbaru. Jika Anda mengubah URL deploy, ganti `appUrl` di `MainActivity.kt` (lihat folder `android_webview_ref`).
 
 ---
 

@@ -3,6 +3,8 @@ IDX-Pro Insight Terminal - Sistem Pendukung Keputusan Saham IDX.
 4 Pilar: ATR (Risiko), Mansfield RS (Momentum), Seasonality, Sentimen Leksikon.
 Login via Firebase Auth; data disimpan di Firestore. Bahasa Indonesia.
 """
+__version__ = "1.3.0"
+
 import streamlit as st
 import plotly.graph_objects as go
 import pandas as pd
@@ -20,17 +22,17 @@ from market_scanner import run_scan, get_ihsg_today, get_intraday_15m, vwap_intr
 from macro_engine import calculate_market_mood, get_macro_indicators
 
 
-@st.cache_data(ttl=300)
+@st.cache_data(ttl=120)
 def _cached_market_mood():
     return calculate_market_mood()
 
 
-@st.cache_data(ttl=300)
+@st.cache_data(ttl=120)
 def _cached_macro_indicators():
     return get_macro_indicators()
 
 
-@st.cache_data(ttl=300)
+@st.cache_data(ttl=120)
 def _cached_sector_leaderboard():
     data = fetch_market_data()
     return get_top_sectors(data) if data else []
@@ -38,7 +40,7 @@ def _cached_sector_leaderboard():
 
 # --- Konfigurasi halaman ---
 st.set_page_config(
-    page_title="IDX-Pro Insight Terminal",
+    page_title=f"IDX-Pro Insight Terminal (v{__version__})",
     page_icon="📈",
     layout="wide",
     initial_sidebar_state="expanded",
@@ -143,6 +145,18 @@ st.markdown("""
     .stTabs [data-baseweb="tab"] { border-radius: 8px; padding: 0.5rem 1rem; color: #c9d1d9 !important; }
     .stTabs [data-baseweb="tab"][aria-selected="true"] { color: #f0f6fc !important; }
     
+    /* Tab halus (radio horizontal Analisis): tampilan seperti tab, transisi halus */
+    .main [data-baseweb="radio-group"] [role="radiogroup"] {
+        display: flex; gap: 0.2rem; flex-wrap: wrap;
+        background: rgba(22,27,34,0.6); border-radius: 12px; padding: 0.4rem;
+        border: 1px solid rgba(48,54,61,0.5);
+    }
+    .main [data-baseweb="radio-group"] label {
+        padding: 0.55rem 1rem; border-radius: 10px; transition: background 0.2s ease, color 0.2s ease;
+        margin: 0; font-weight: 500; cursor: pointer;
+    }
+    .main [data-baseweb="radio-group"] label:hover { background: rgba(48,54,61,0.35); }
+    
     hr { margin: 1.25rem 0; border-color: rgba(48,54,61,0.4); }
     .main .block-container > div { margin-bottom: 0.5rem; }
 </style>
@@ -203,7 +217,7 @@ def get_invite_code():
 
 with st.sidebar:
     st.markdown("### IDX-Pro Insight")
-    st.caption("Terminal · Analisis Saham IDX")
+    st.caption(f"Terminal · Analisis Saham IDX · **v{__version__}**")
     st.divider()
 
     if logged_in:
@@ -397,9 +411,10 @@ if menu == "Peluang Hari Ini":
     else:
         chart_ticker = "BBCA"
     chart_ticker_jk = ensure_jk(chart_ticker)
-    st.subheader(f"Grafik Intraday 15m · {chart_ticker}")
+    intraday_interval = st.radio("Interval grafik intraday", ["5m", "15m"], horizontal=True, key="intraday_interval", index=0)
+    st.subheader(f"Grafik Intraday {intraday_interval} · {chart_ticker}")
     try:
-        idf, last_ts = get_intraday_15m(chart_ticker_jk)
+        idf, last_ts = get_intraday_15m(chart_ticker_jk, interval=intraday_interval)
         if idf is not None and not idf.empty:
             vwap_series = vwap_intraday(idf)
             fig_c = go.Figure()
@@ -495,13 +510,19 @@ elif menu == "Analisis Mendalam" or menu == "Market Overview":
     _tab_names = ["Dashboard Utama", "Manajemen Risiko (ATR)", "Analisis Musiman", "Sentimen Berita"]
     if "analisis_sub_tab" not in st.session_state:
         st.session_state.analisis_sub_tab = _tab_names[0]
-    sub_tab = st.radio(
-        "Bagian",
-        _tab_names,
-        key="analisis_sub_tab",
-        horizontal=True,
-        label_visibility="collapsed",
-    )
+    col_tab, col_refresh = st.columns([5, 1])
+    with col_tab:
+        sub_tab = st.radio(
+            "Bagian",
+            _tab_names,
+            key="analisis_sub_tab",
+            horizontal=True,
+            label_visibility="collapsed",
+        )
+    with col_refresh:
+        if st.button("Refresh data", help="Perbarui data pasar dan analisis (clear cache)"):
+            st.cache_data.clear()
+            st.rerun()
 
     _chart_layout = dict(
         template="plotly_dark",
@@ -603,9 +624,10 @@ elif menu == "Analisis Mendalam" or menu == "Market Overview":
         if data_as_of or trading_days_count:
             st.caption(f"**Data harga per {data_as_of or '-'}** · Berdasarkan {trading_days_count} hari perdagangan. Sumber: Yahoo Finance. Data dapat tertunda.")
         if insight_summary:
-            st.info(f"**Ringkasan Telaah:** {insight_summary}")
+            st.markdown("#### Ringkasan Telaah")
+            st.markdown(insight_summary)
 
-        # Kesimpulan & Rekomendasi: saran beli/tidak + range harga
+        # Kesimpulan & Rekomendasi: saran beli/tidak + range harga (lebih terstruktur dan rinci)
         if recommendation:
             rec_style = recommendation.get("style", "")
             rec_label = recommendation.get("style_label", "")
@@ -635,7 +657,8 @@ elif menu == "Analisis Mendalam" or menu == "Market Overview":
                 if risk_l > 0:
                     rr = risk_r / risk_l
                     st.metric("Risk/Reward (R:R)", f"1 : {rr:.1f}", "Semakin tinggi semakin menguntungkan")
-            st.caption(summary)
+            st.markdown("**Rincian kesimpulan:**")
+            st.markdown(summary)
             if logged_in:
                 if st.button("Simpan rekomendasi ke Jurnal", key="save_rec"):
                     rec_entry = {

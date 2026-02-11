@@ -42,3 +42,11 @@ Aplikasi memakai beberapa sumber data. **Struktur dan tampilan tidak berubah**; 
 | Bitcoin        | Yahoo (BTC-USD)   | Alpha Vantage (DIGITAL_CURRENCY_DAILY) |
 
 Tanpa konfigurasi tambahan, aplikasi tetap jalan penuh dengan Yahoo Finance. Fallback hanya menambah ketersediaan saat Yahoo sementara gagal.
+
+---
+
+## Pembaruan data lebih cepat
+
+- **TTL cache:** Data pasar (market mood, makro, sektor, saham, scanner) di-cache dengan TTL singkat (2–10 menit). **Grafik intraday 15m** di-cache 5 menit (sinkron dengan data saham). Setelah TTL lewat, data diambil ulang otomatis.
+- **Tombol "Refresh data":** Di halaman Analisis Mendalam / Market Overview, gunakan tombol **Refresh data** untuk memaksa pembaruan segera (clear cache lalu muat ulang, termasuk grafik intraday di Peluang Hari Ini). Berguna saat ingin harga/analisis terbaru tanpa menunggu TTL.
+- **Keterlambatan sumber:** Yahoo Finance (dan bursa) bisa punya delay 15–20 menit untuk data intraday. Untuk data benar-benar real-time, dibutuhkan sumber berbayar (mis. bursa/Reuters); aplikasi ini mengandalkan Yahoo agar gratis dan stabil.
