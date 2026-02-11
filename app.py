@@ -670,13 +670,12 @@ elif menu == "Analisis Mendalam" or menu == "Market Overview":
             fig.add_trace(go.Scatter(x=df.index, y=df["MA50"], name="MA50", line=dict(color="#a371f7", width=1.5)))
         if "MA200" in df.columns:
             fig.add_trace(go.Scatter(x=df.index, y=df["MA200"], name="MA200", line=dict(color="#39c5cf", width=1.5)))
-        # Aktifkan pan & zoom horizontal yang nyaman dengan range slider
+        # Pan & zoom: geser kiri/kanan setelah zoom (rangeslider hanya untuk Candlestick, bukan Scatter)
         fig.update_layout(
             **_chart_layout,
             height=420,
             yaxis_title="Harga (Rp)",
             dragmode="pan",
-            xaxis=dict(rangeslider=dict(visible=True))
         )
         st.plotly_chart(fig, use_container_width=True)
 
